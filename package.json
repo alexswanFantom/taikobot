@@ -1,0 +1,32 @@
+{
+  "name": "taiko",
+  "version": "1.0.0",
+  "description": "automaticaly make transaction on taiko mainnet",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexswanFantom/taiko.git"
+  },
+  "author": "remover",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/alexswanFantom/taiko/issues"
+  },
+  "homepage": "https://github.com/alexswanFantom/taiko#readme",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "bip39": "^3.1.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4",
+    "moment-timezone": "^0.5.46",
+    "random": "^5.1.1",
+    "twisters": "^1.1.0",
+    "wcwidth": "^1.0.1",
+    "web3": "^4.14.0",
+    "winston": "^3.15.0"
+  }
+}
