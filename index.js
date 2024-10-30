@@ -20,8 +20,6 @@ async function countdown(core) {
     const countdownInterval = setInterval(() => {
       const timeLeft = delayMs / 1000 - elapsedTime;
       const timeString = Helper.msToTime(timeLeft * 1000);
-
-      // Memperbarui pesan dengan waktu tersisa
       try {
         Twist.log(
           "This account still in countdown ",
@@ -29,15 +27,13 @@ async function countdown(core) {
           core,
           `${
             spinnerChars[elapsedTime % spinnerChars.length]
-          } Account ${accountIndex} Processing Done, Delaying for ${timeString}`
+          } Account ${accountIndex} Processing Done, Daily Max Reached, Delaying for ${timeString}`
         );
       } catch (error) {
         console.error("Error logging countdown:", error);
       }
 
       elapsedTime++;
-
-      // Jika waktu habis, hentikan interval
       if (elapsedTime >= delayMs / 1000) {
         clearInterval(countdownInterval);
         Twist.log(
@@ -46,7 +42,7 @@ async function countdown(core) {
           core,
           "Resuming operations..."
         );
-        resolve(); // Selesaikan promise setelah countdown selesai
+        resolve();
       }
     }, 1000);
   });
@@ -61,16 +57,16 @@ async function operateAccount(privateKey) {
     while (true) {
       try {
         if (core.swapCount >= Settup.MAXCOUNT) {
-          await countdown(core); // Tunggu hingga countdown selesai
-          core.swapCount = 0; // Reset swapCount setelah countdown
+          await countdown(core);
+          core.swapCount = 0;
         } else {
-          await core.performSwap(); // Lakukan swap
+          await core.performSwap();
         }
-        await sleep(1000); // Tunggu sejenak sebelum iterasi berikutnya
+        await sleep(1000);
       } catch (error) {
         console.error("Error in account operation:", error);
         await core.handleError("Failed to perform swap", error.message);
-        await sleep(5000); // Tunggu sebelum mencoba lagi
+        await sleep(5000);
       }
     }
   } catch (error) {
@@ -85,10 +81,9 @@ async function operateAccount(privateKey) {
   Helper.showLogo();
 
   if (!Array.isArray(privateKey) || privateKey.length < 1) {
-    throw new Error("Please set up accounts.js first");
+    throw new Error("Please set up Settup.js first");
   }
 
-  // Menggunakan for...of untuk menjalankan setiap akun secara independen
   for (const key of privateKey) {
     operateAccount(key).catch((error) => {
       console.error("Error operating account:", error);

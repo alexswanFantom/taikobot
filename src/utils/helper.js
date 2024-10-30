@@ -5,7 +5,6 @@ import { Settup } from "../../settup.js";
 import wcwidth from "wcwidth";
 
 export class Helper {
-  //Colors
   static COLORS = {
     BLACK: "\x1b[90m",
     RED: "\x1b[31m",
@@ -28,33 +27,30 @@ export class Helper {
     status = ""
   ) {
     return new Promise((resolve) => {
-      let loading; // Deklarasikan loading di luar setTimeout
-      const spinnerChars = Settup.animation; // Karakter untuk spinner
-      let spinnerIndex = 0; // Indeks untuk karakter spinner
-      let elapsedTime = 0; // Waktu yang berlalu dalam detik
+      let loading;
+      const spinnerChars = Settup.animation;
+      let spinnerIndex = 0;
+      let elapsedTime = 0;
 
-      // Menampilkan log awal
       if (accountKey) {
         Twist.log(action, accountKey, accountData, status);
       }
 
       loading = setInterval(() => {
-        // Hitung detik yang telah berlalu
         const seconds = Math.floor(elapsedTime % 60);
-        // Update log dengan spinner dan waktu
         Twist.log(
           action,
           accountKey,
           accountData,
           `${spinnerChars[spinnerIndex]} ${seconds}s ${status}...`
         );
-        spinnerIndex = (spinnerIndex + 1) % spinnerChars.length; // Update indeks
-        elapsedTime++; // Increment elapsed time
-      }, 1000); // Setiap 1000 ms (1 detik)
+        spinnerIndex = (spinnerIndex + 1) % spinnerChars.length;
+        elapsedTime++;
+      }, 1000);
 
       setTimeout(() => {
-        clearInterval(loading); // Hentikan animasi setelah delay
-        resolve(); // Selesaikan promise
+        clearInterval(loading);
+        resolve();
       }, ms);
     });
   }
@@ -125,22 +121,27 @@ export class Helper {
     };
 
     const centerLog = (message) => {
-      const width = process.stdout.columns || 80; // Default to 80 if columns is not available
-      const messageWidth = wcwidth(message); // Menghitung lebar pesan
+      const width = process.stdout.columns || 80;
+      const messageWidth = wcwidth(message);
       const padding = Math.max(Math.floor((width - messageWidth) / 2), 0);
 
       console.log(" ".repeat(padding) + message);
     };
 
+    let banner = "  ";
+    ("");
+    ("");
+    ("");
+    ("");
+    ("");
+
     const logoLines = [
-      `${ConsoleColors.RED}   █████████   █████ ███████████   ██████████   ███████████      ███████    ███████████       █████████    █████████    █████████`,
-      `${ConsoleColors.RED}  ███░░░░░███ ░░███ ░░███░░░░░███ ░░███░░░░███ ░░███░░░░░███   ███░░░░░███ ░░███░░░░░███     ███░░░░░███  ███░░░░░███  ███░░░░░███`,
-      `${ConsoleColors.RED} ░███    ░███  ░███  ░███    ░███  ░███   ░░███ ░███    ░███  ███     ░░███ ░███    ░███    ░███    ░███ ░███    ░░░  ███     ░░░`,
-      `${ConsoleColors.RED} ░███████████  ░███  ░██████████   ░███    ░███ ░██████████  ░███      ░███ ░██████████     ░███████████ ░░█████████ ░███         `,
-      `${ConsoleColors.WHITE} ░███░░░░░███  ░███  ░███░░░░░███  ░███    ░███ ░███░░░░░███ ░███      ░███ ░███░░░░░░      ░███░░░░░███  ░░░░░░░░███░███         `,
-      `${ConsoleColors.WHITE} ░███    ░███  ░███  ░███    ░███  ░███    ███  ░███    ░███ ░░███     ███  ░███            ░███    ░███  ███    ░███░░███     ███`,
-      `${ConsoleColors.WHITE} █████   █████ █████ █████   █████ ██████████   █████   █████ ░░░███████░   █████           █████   █████░░█████████  ░░█████████`,
-      `${ConsoleColors.WHITE} ░░░░░   ░░░░░ ░░░░░ ░░░░░   ░░░░░ ░░░░░░░░░░   ░░░░░   ░░░░░    ░░░░░░░    ░░░░░           ░░░░░   ░░░░░  ░░░░░░░░░    ░░░░░░░░░  `,
+      `${ConsoleColors.RED}   █████╗ ██╗██████╗ ██████╗ ██████╗  ██████╗ ██████╗      █████╗ ███████╗ ██████╗`,
+      `${ConsoleColors.RED}  ██╔══██╗██║██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗    ██╔══██╗██╔════╝██╔════╝`,
+      `${ConsoleColors.RED}  ███████║██║██████╔╝██║  ██║██████╔╝██║   ██║██████╔╝    ███████║███████╗██║     `,
+      `${ConsoleColors.WHITE}  ██╔══██║██║██╔══██╗██║  ██║██╔══██╗██║   ██║██╔═══╝     ██╔══██║╚════██║██║      `,
+      `${ConsoleColors.WHITE}   ██║  ██║██║██║  ██║██████╔╝██║  ██║╚██████╔╝██║         ██║  ██║███████║╚██████╗  `,
+      `${ConsoleColors.WHITE}   ╚═╝  ╚═╝╚═╝╚═╝  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝            ╚═╝  ╚═╝╚══════╝ ╚═════╝ `,
     ];
 
     logoLines.forEach(centerLog);
@@ -157,7 +158,7 @@ export class Helper {
     );
     centerLog(` `);
     centerLog(
-      `Tip me for buyying coffee : ${ConsoleColors.GREEN}0xbfA6c7bF6dD515B5200d6aD65d729838dD20aBBE${ConsoleColors.RESET}`
+      `Tip me for buying coffee : ${ConsoleColors.GREEN}0xbfA6c7bF6dD515B5200d6aD65d729838dD20aBBE${ConsoleColors.RESET}`
     );
     centerLog(` `);
     centerLog(` `);

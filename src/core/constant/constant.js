@@ -19,7 +19,6 @@ export const routermap = {
   izumi: "0x04830cfCED9772b8ACbAF76Cfc7A630Ad82c9148",
 };
 
-// Fungsi untuk memvalidasi alamat
 export function validateAddress(address) {
   try {
     return ethers.getAddress(address);
@@ -28,7 +27,6 @@ export function validateAddress(address) {
   }
 }
 
-// Fungsi untuk mendapatkan alamat token berdasarkan kunci
 export function getContract(contractName) {
   if (!(contractName in contractAddress)) {
     throw new Error(`Contract ${contractName} not found in contractAddress`);

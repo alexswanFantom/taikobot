@@ -66,14 +66,13 @@ export default class Core {
     this.WETH_ABI = WETHABI;
     this.ERC20_ABI = ERC20_ABI;
     this.ROUTER_ABI = IZUMIABI;
-
-    // Inisialisasi variabel dalam satu objek
     this.txCount = this.swapCount = 0;
     this.walletInstance = null;
     this.balance = [];
     this.address = null;
     this.lastNonce = -1;
     this.rank = this.score = 0;
+
     this.pendingTransactions = new Map();
   }
 
@@ -127,7 +126,7 @@ export default class Core {
         this,
         `path/fee lengths do not match`
       );
-      return null; // Mengembalikan null jika ada kesalahan
+      return null;
     }
 
     return (
@@ -283,7 +282,8 @@ export default class Core {
           : amount === this.UINT256MAX
           ? "uint max"
           : amount.toString();
-      let action = amount === 0 ? "Unapprove" : "Approve";
+      let action = amount === 0 ? "Unapproving" : "Approving";
+
       Twist.log(
         `Executing: ${action} ${formattedAmount} ${tokenName} to ${spender}`,
         this.acc,
@@ -294,7 +294,7 @@ export default class Core {
       const tx = await this.handleTransaction(
         () =>
           smartContract.approve(spender, amount, {
-            gasLimit: 175000,
+            gasLimit: 75000,
             gasPrice: this.FIXED_GAS_PRICE,
           }),
         `${action} ${tokenName}`
@@ -303,7 +303,11 @@ export default class Core {
         return this.handleError(action, `Transaction failed to send.`);
       }
 
-      await this.waitForTransactionConfirmation(tx.hash, action);
+      await this.waitForTransactionConfirmation(
+        tx.hash,
+        `${action} ${tokenName}`
+      );
+
       Twist.log(
         `📋 Transaction executed at tx: ${tx.hash}`,
         this.acc,
@@ -420,8 +424,8 @@ export default class Core {
         path: path,
         recipient: this.address,
         amount: amountIn,
-        minAcquired: 0, // Anda bisa mengganti ini sesuai dengan logika minimum yang diinginkan
-        deadline: Math.floor(Date.now() / 1000) + 1800, // Deadline 30 menit dari sekarang
+        minAcquired: 0,
+        deadline: Math.floor(Date.now() / 1000) + 1800,
       };
 
       const data = this.swapRouterContract.interface.encodeFunctionData(
@@ -463,7 +467,7 @@ export default class Core {
 
         const transactionHash = tx.hash || "N/A";
         await this.waitForTransactionConfirmation(transactionHash, action);
-
+        await this.fetchUserHistory(tx.hash);
         Twist.log(
           `📋 Transaction executed at tx: ${transactionHash}`,
           this.acc,
@@ -549,6 +553,7 @@ export default class Core {
         }
 
         const transactionHash = tx.hash || "N/A";
+        await this.fetchUserHistory(tx.hash);
         await this.waitForTransactionConfirmation(transactionHash, action);
 
         Twist.log(
@@ -595,7 +600,7 @@ export default class Core {
     try {
       let encode = await this.wethContract.interface.encodeFunctionData(
         "withdraw",
-        [amount.toString()] // Pastikan argumen dibungkus dalam array
+        [amount.toString()]
       );
 
       const transaction = {
@@ -603,13 +608,13 @@ export default class Core {
         from: this.address,
         value: 0,
         data: encode,
-        gasLimit: 155000,
+        gasLimit: 55000,
         gasPrice: this.FIXED_GAS_PRICE,
         nonce: await this.provider.getTransactionCount(this.address),
       };
 
       try {
-        let action = `🔄 Unwraping ${Number(
+        let action = `🔄 Unwrapping ${Number(
           ethers.formatUnits(amount, 18)
         ).toFixed(8)} WETH into ETH`;
         const tx = await this.retryTransaction(async () => {
@@ -628,7 +633,7 @@ export default class Core {
 
         const transactionHash = tx.hash || "N/A";
         await this.waitForTransactionConfirmation(transactionHash, action);
-
+        await this.fetchUserHistory(tx.hash);
         Twist.log(
           `📋 Transaction executed at tx: ${transactionHash}`,
           this.acc,
@@ -640,6 +645,7 @@ export default class Core {
 
         this.swapCount++;
         await this.sleep(1000);
+
         await this.getBalances(true);
       } catch (error) {
         const errorMessage = error.message || "Unknown error";
@@ -671,7 +677,6 @@ export default class Core {
   }
 
   async waitForTransactionConfirmation(txHash, action) {
-    // Validasi hash transaksi
     if (!txHash || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
       this.handleError(action, "Invalid transaction hash");
       return null;
@@ -866,6 +871,50 @@ export default class Core {
         "Referrer-Policy": "strict-origin-when-cross-origin",
       },
     };
+  }
+
+  async fetchUserHistory(txHash) {
+    try {
+      let config = {
+        url: `https://trailblazer.mainnet.taiko.xyz/s2/user/history?address=${this.address}`,
+        method: "GET",
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+          accept: "application/json, text/plain, */*",
+          "accept-language": "id-ID,id;q=0.9",
+          "cache-control": "no-cache",
+          pragma: "no-cache",
+          priority: "u=1, i",
+          "sec-ch-ua":
+            '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"Windows"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-site",
+          Referer: "https://trailblazers.taiko.xyz/",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+        },
+      };
+
+      const result = await axios(config);
+
+      if (result.status === 200) {
+        const item = result.data.items.find((item) => item.tx_hash === txHash);
+        if (item) {
+          this.points = item.points;
+        }
+      } else {
+        this.handleError(
+          "Failed to get user history.",
+          `Unexpected status code: ${result.status}`
+        );
+        return null;
+      }
+    } catch (err) {
+      return this.handleAxiosError(err);
+    }
   }
 
   handleAxiosError(error) {

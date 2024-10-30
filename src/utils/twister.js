@@ -29,15 +29,14 @@ class Twist {
     );
     const address = this.formatAddress(accountData.address);
 
-    // Tentukan warna berdasarkan status
-    let statusColor = COLORS.GREEN; // Default color
+    let statusColor = COLORS.GREEN;
 
     if (status.toLowerCase().includes("error")) {
-      statusColor = COLORS.RED; // Warna merah untuk error
+      statusColor = COLORS.RED;
     } else if (status.toLowerCase().includes("success")) {
-      statusColor = COLORS.GREEN; // Warna hijau untuk sukses
+      statusColor = COLORS.GREEN;
     } else if (status.toLowerCase().includes("done")) {
-      statusColor = COLORS.GREEN; // Warna hijau untuk sukses
+      statusColor = COLORS.GREEN;
     } else {
       statusColor = COLORS.YELLOW;
     }
@@ -70,7 +69,7 @@ class Twist {
       text: template,
     });
   }
-  //MAXCOUNT
+
   formatCount(current, max) {
     return `${current ?? 0} / ${max} ${
       (current ?? 0) === max ? "Finished" : ""

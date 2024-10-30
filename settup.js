@@ -1,5 +1,5 @@
 export class Settup {
-  static SWAPCOUNT = 5; // x7 transaction
+  static SWAPCOUNT = 1; // 1x run = x13 transaction
   static MAXCOUNT = this.SWAPCOUNT * 13;
   static DELAYINHOURS = 24;
   static privateKey = [""];
@@ -23,6 +23,6 @@ export class Settup {
   static MAXBUY = "0.00005";
   static DELAY = 0.1;
   static DELAYINHOURS = 24;
-  static GASPRICE = "0.2";
-  static GASLIMIT = 550000;
+  static GASPRICE = "0.2"; // 1000 point
+  static GASLIMIT = 275000; // you can  change
 }
