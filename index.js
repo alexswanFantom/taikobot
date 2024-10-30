@@ -1,7 +1,7 @@
 import { Settup } from "./settup.js";
-import Core from "./app/src/core/core.js";
-import { Helper } from "./app/src/utils/helper.js";
-import Twist from "./app/src/utils/twister.js";
+import Core from "./src/core/core.js";
+import { Helper } from "./src/utils/helper.js";
+import Twist from "./src/utils/twister.js";
 const privateKey = Settup.privateKey;
 
 async function sleep(ms) {
