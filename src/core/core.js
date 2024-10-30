@@ -8,7 +8,7 @@ import {
   getContract,
   tokenDecimals,
 } from "./constant/constant.js";
-import { Settup } from "../../../settup.js";
+import { Settup } from "../../settup.js";
 import axios from "axios";
 
 import { tokenPath } from "./path/path.js";

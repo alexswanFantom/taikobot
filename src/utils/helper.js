@@ -1,7 +1,7 @@
 import Twist from "./twister.js";
 import bip39 from "bip39";
 import moment from "moment-timezone";
-import { Settup } from "../../../settup.js";
+import { Settup } from "../../settup.js";
 import wcwidth from "wcwidth";
 
 export class Helper {

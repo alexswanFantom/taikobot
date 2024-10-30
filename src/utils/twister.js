@@ -1,6 +1,6 @@
 import { Twisters } from "twisters";
 import Core from "../core/core.js";
-import { Settup } from "../../../settup.js";
+import { Settup } from "../../settup.js";
 
 const COLORS = {
   BLACK: "\x1b[90m",
