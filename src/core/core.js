@@ -64,7 +64,7 @@ export default class Core {
       ERC20: ERC20_ABI,
       ROUTER: IZUMIABI,
     };
-    this.txCount = this.swapCount = 0;
+    this.txCount = this.swapCount = this.runCount = 0;
     this.walletInstance = null;
     this.balance = [];
     this.address = null;
@@ -220,7 +220,7 @@ export default class Core {
       `Allowance for ${tokenName.toUpperCase()}: ${formattedAllowance}`
     );
 
-    if (allowance < this.UINT256MAX) {
+    if (allowance != this.UINT256MAX) {
       await this.approveToken(
         tokenAddress,
         this.UINT256MAX,
@@ -263,9 +263,7 @@ export default class Core {
       `Allowance for ${tokenName.toUpperCase()}: ${formattedAllowance}`
     );
 
-    await this.sleep(2000);
-
-    if (allowance === this.UINT256MAX) {
+    if (allowance > 0) {
       await this.approveToken(tokenAddress, 0, this.contracts.ROUTER_ADDRESS);
     }
   }
@@ -677,7 +675,7 @@ export default class Core {
       );
 
       this.swapCount++;
-      await this.sleep(1000);
+      this.runCount++;
       await this.getBalances(true);
     } catch (error) {
       console.error(error);

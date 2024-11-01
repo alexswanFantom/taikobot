@@ -56,9 +56,9 @@ async function operateAccount(privateKey) {
 
     while (true) {
       try {
-        if (core.swapCount >= Setup.MAXCOUNT) {
+        if (core.runCount >= Setup.RUNCOUNT) {
           await countdown(core);
-          core.swapCount = 0;
+          core.runCount = 0;
         } else {
           await core.performSwap();
         }

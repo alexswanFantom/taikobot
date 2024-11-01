@@ -1,6 +1,7 @@
 export class Setup {
   static SWAPCOUNT = 1; // 1x run = x13 transaction
-  static MAXCOUNT = this.SWAPCOUNT * 13;
+  static RUNCOUNT = 1;
+
   static DELAYINHOURS = 24;
   static privateKey = [""];
 

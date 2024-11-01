@@ -51,10 +51,8 @@ class Twist {
                     ├> 💰 ${usdt}
                     └> 💰 ${taiko}
 
-  ├> Tx Count       ├> ${this.formatCount(
-    accountData.swapCount,
-    Setup.MAXCOUNT
-  )}
+  ├> Tx Count       ├> ${accountData.swapCount}
+  ├> Run Count      ├> ${this.formatCount(accountData.runCount, Setup.RUNCOUNT)}
 
   ├> Current Rank   ├> ${accountData.rank} 
   ├> Current Score  ├> ${accountData.score}
