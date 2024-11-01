@@ -1,6 +1,6 @@
 import { Twisters } from "twisters";
 import Core from "../core/core.js";
-import { Settup } from "../../settup.js";
+import { Setup } from "../../setup.js";
 
 const COLORS = {
   BLACK: "\x1b[90m",
@@ -22,7 +22,7 @@ class Twist {
   }
 
   log(action = "", accountKey = "", accountData = new Core(), status = "") {
-    const accountIndex = Settup.privateKey.indexOf(accountKey);
+    const accountIndex = Setup.privateKey.indexOf(accountKey);
 
     const { eth, weth, taiko, usdc, usdt } = this.formatBalances(
       accountData.balance
@@ -41,9 +41,9 @@ class Twist {
       statusColor = COLORS.YELLOW;
     }
 
-    const template = `${COLORS.RESET}======================= Account ${
+    const template = `${COLORS.RESET}======================== Account ${
       accountIndex + 1
-    } ====================
+    } =====================
   ┌> Address        ┌> ${address}
   └> Balance        ├> 💰 ${eth}
                     ├> 💰 ${weth}
@@ -53,7 +53,7 @@ class Twist {
 
   ├> Tx Count       ├> ${this.formatCount(
     accountData.swapCount,
-    Settup.MAXCOUNT
+    Setup.MAXCOUNT
   )}
 
   ├> Current Rank   ├> ${accountData.rank} 

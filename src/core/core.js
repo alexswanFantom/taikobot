@@ -1,16 +1,11 @@
 import { ethers } from "ethers";
+import axios from "axios";
 import { Helper } from "../utils/helper.js";
 import { rpc } from "./network/rpc.js";
-import { IZUMIABI, WETHABI, ERC20_ABI, poolABI } from "./abi/abi.js";
+import { IZUMIABI, WETHABI, ERC20_ABI } from "./abi/abi.js";
 import Twist from "../utils/twister.js";
-import {
-  validateAddress,
-  getContract,
-  tokenDecimals,
-} from "./constant/constant.js";
-import { Settup } from "../../settup.js";
-import axios from "axios";
-
+import { validateAddress, getContract } from "./constant/constant.js";
+import { Setup } from "../../setup.js"; //Setup
 import { tokenPath } from "./path/path.js";
 
 export default class Core {
@@ -18,18 +13,17 @@ export default class Core {
     if (!accounts) throw new Error("Accounts are required");
     this.acc = accounts;
     this.UINT256MAX = ethers.MaxUint256;
-    this.setupProvider()
-      .then(() => this.initializeConstants())
-      .then(() => this.initializeWallet())
-      .catch((error) => {
-        Twist.log(
-          `Failed to setup provider`,
-          this.acc,
-          this,
-          `${error.message}`
-        );
-        return null;
-      });
+    this.init();
+  }
+
+  async init() {
+    try {
+      await this.setupProvider();
+      await this.initializeConstants();
+      await this.initializeWallet();
+    } catch (error) {
+      this.handleError(`Failed to initialize`, error.message);
+    }
   }
 
   async setupProvider() {
@@ -47,32 +41,35 @@ export default class Core {
         return;
       } catch (error) {
         this.handleError(
-          `Failed connecting to provider`,
-          `${provider.connection?.url || "unknown URL"}, error: ${
-            error.message
-          }`
+          `Failed connecting to provider: ${
+            provider.connection?.url || "unknown URL"
+          }`,
+          error.message
         );
       }
     }
   }
 
   async initializeConstants() {
-    this.FIXED_GAS_PRICE = ethers.parseUnits(Settup.GASPRICE, "gwei");
-    this.WETH = validateAddress(getContract("weth"));
-    this.TAIKO = validateAddress(getContract("taiko"));
-    this.USDC = validateAddress(getContract("usdc"));
-    this.USDT = validateAddress(getContract("usdt"));
-    this.ROUTER_ADDRESS = validateAddress(getContract("izumi-swap"));
-    this.WETH_ABI = WETHABI;
-    this.ERC20_ABI = ERC20_ABI;
-    this.ROUTER_ABI = IZUMIABI;
+    this.FIXED_GAS_PRICE = ethers.parseUnits(Setup.GASPRICE, "gwei");
+    this.contracts = {
+      WETH: validateAddress(getContract("weth")),
+      TAIKO: validateAddress(getContract("taiko")),
+      USDC: validateAddress(getContract("usdc")),
+      USDT: validateAddress(getContract("usdt")),
+      ROUTER_ADDRESS: validateAddress(getContract("izumi-swap")),
+    };
+    this.ABIs = {
+      WETH: WETHABI,
+      ERC20: ERC20_ABI,
+      ROUTER: IZUMIABI,
+    };
     this.txCount = this.swapCount = 0;
     this.walletInstance = null;
     this.balance = [];
     this.address = null;
     this.lastNonce = -1;
     this.rank = this.score = 0;
-
     this.pendingTransactions = new Map();
   }
 
@@ -96,36 +93,47 @@ export default class Core {
       );
       await this.getBalances(true);
     } catch (error) {
-      await this.handleError(`Failed initializing wallet`, `${error.message}`);
+      this.handleError(`Failed initializing wallet: `, `${error.message}`);
     }
   }
 
   initializeContracts() {
-    const contracts = {
-      weth: { address: this.WETH, abi: WETHABI },
-      taiko: { address: this.TAIKO, abi: this.ERC20_ABI },
-      usdc: { address: this.USDC, abi: this.ERC20_ABI },
-      usdt: { address: this.USDT, abi: this.ERC20_ABI },
-      swapRouter: { address: this.ROUTER_ADDRESS, abi: this.ROUTER_ABI },
-    };
-
-    for (const [key, { address, abi }] of Object.entries(contracts)) {
-      this[`${key}Contract`] = new ethers.Contract(
-        address,
-        abi,
+    this.contractInstances = {
+      weth: new ethers.Contract(
+        this.contracts.WETH,
+        this.ABIs.WETH,
         this.walletInstance
-      );
-    }
+      ),
+      taiko: new ethers.Contract(
+        this.contracts.TAIKO,
+        this.ABIs.ERC20,
+        this.walletInstance
+      ),
+      usdc: new ethers.Contract(
+        this.contracts.USDC,
+        this.ABIs.ERC20,
+        this.walletInstance
+      ),
+      usdt: new ethers.Contract(
+        this.contracts.USDT,
+        this.ABIs.ERC20,
+        this.walletInstance
+      ),
+      swapRouter: new ethers.Contract(
+        this.contracts.ROUTER_ADDRESS,
+        this.ABIs.ROUTER,
+        this.walletInstance
+      ),
+    };
   }
 
   async encodedPath(path, fees) {
     if (path.length !== fees.length + 1) {
-      Twist.log(
-        `encodedPath error`,
-        this.acc,
-        this,
+      this.handleError(
+        `Failed encodedPath error`,
         `path/fee lengths do not match`
       );
+
       return null;
     }
 
@@ -146,10 +154,10 @@ export default class Core {
 
       const balances = await Promise.all([
         this.provider.getBalance(this.address),
-        this.wethContract.balanceOf(this.address),
-        this.taikoContract.balanceOf(this.address),
-        this.usdcContract.balanceOf(this.address),
-        this.usdtContract.balanceOf(this.address),
+        this.contractInstances.weth.balanceOf(this.address),
+        this.contractInstances.taiko.balanceOf(this.address),
+        this.contractInstances.usdc.balanceOf(this.address),
+        this.contractInstances.usdt.balanceOf(this.address),
       ]);
 
       this.balance = balances.map((balance, index) =>
@@ -168,41 +176,42 @@ export default class Core {
           "Balance updated!",
           this.acc,
           this,
-          "✅ Successfully update Balance"
+          "✅ Successfully updated Balance"
         );
       }
       return this.balance;
     } catch (error) {
-      this.handleError(`Failed update balance`, error);
+      this.handleError(`Failed to update balance`, ` ${error.message}`);
       return null;
     }
   }
 
   async checkAndApprove(tokenName) {
-    const validTokens = ["usdc", "usdt", "taiko", "weth"];
-    if (!validTokens.includes(tokenName.toLowerCase())) {
-      return this.handleError(`Token name is not recognized`);
+    const validTokens = new Set(["usdc", "usdt", "taiko", "weth"]);
+    tokenName = tokenName.toLowerCase();
+
+    if (!validTokens.has(tokenName)) {
+      return this.handleError(
+        `Failed to check Allowance`,
+        `Token name "${tokenName}" is not recognized`
+      );
     }
 
     const tokenAddress = validateAddress(getContract(tokenName));
     if (!tokenAddress) {
       return this.handleError(
-        `Invalid token address for ${tokenName}`,
-        `Invalid token address`
+        `Failed to check Allowance`,
+        `Invalid token address for ${tokenName}`
       );
     }
 
     const allowance = await this.checkAllowance(
       tokenAddress,
-      this.ROUTER_ADDRESS,
+      this.contracts.ROUTER_ADDRESS,
       this.address
     );
-    let formattedAllowance =
-      Number(allowance.toString()) === 0
-        ? "0"
-        : Number(allowance.toString()) === Number(this.UINT256MAX.toString())
-        ? "uint256max"
-        : Number(allowance.toString());
+
+    const formattedAllowance = this.formatAllowance(allowance);
 
     Twist.log(
       `Checking allowance`,
@@ -211,40 +220,41 @@ export default class Core {
       `Allowance for ${tokenName.toUpperCase()}: ${formattedAllowance}`
     );
 
-    if (Number(allowance.toString()) < Number(this.UINT256MAX.toString())) {
+    if (allowance < this.UINT256MAX) {
       await this.approveToken(
         tokenAddress,
         this.UINT256MAX,
-        this.ROUTER_ADDRESS
+        this.contracts.ROUTER_ADDRESS
       );
     }
   }
 
   async checkAndUnapprove(tokenName) {
-    const validTokens = ["usdc", "usdt", "taiko", "weth"];
-    if (!validTokens.includes(tokenName.toLowerCase())) {
-      return this.handleError(`Token name is not recognized`);
+    const validTokens = new Set(["usdc", "usdt", "taiko", "weth"]);
+    tokenName = tokenName.toLowerCase();
+
+    if (!validTokens.has(tokenName)) {
+      return this.handleError(
+        `Failed to check Allowance`,
+        `Token name "${tokenName}" is not recognized`
+      );
     }
 
     const tokenAddress = validateAddress(getContract(tokenName));
     if (!tokenAddress) {
       return this.handleError(
-        `Invalid token address for ${tokenName}`,
-        `Invalid token address`
+        `Failed to check Allowance`,
+        `Invalid token address for ${tokenName}`
       );
     }
 
     const allowance = await this.checkAllowance(
       tokenAddress,
-      this.ROUTER_ADDRESS,
+      this.contracts.ROUTER_ADDRESS,
       this.address
     );
-    let formattedAllowance =
-      Number(allowance.toString()) === 0
-        ? "0"
-        : Number(allowance.toString()) === Number(this.UINT256MAX.toString())
-        ? "uint max"
-        : Number(allowance.toString());
+
+    const formattedAllowance = this.formatAllowance(allowance);
 
     Twist.log(
       `Checking allowance`,
@@ -252,26 +262,36 @@ export default class Core {
       this,
       `Allowance for ${tokenName.toUpperCase()}: ${formattedAllowance}`
     );
+
     await this.sleep(2000);
-    if (Number(allowance.toString()) === Number(this.UINT256MAX.toString())) {
-      await this.approveToken(tokenAddress, 0, this.ROUTER_ADDRESS);
+
+    if (allowance === this.UINT256MAX) {
+      await this.approveToken(tokenAddress, 0, this.contracts.ROUTER_ADDRESS);
     }
   }
 
   async checkAllowance(tokenAddress, spender, owner) {
     const smartContract = new ethers.Contract(
       tokenAddress,
-      this.ERC20_ABI,
+      this.ABIs.ERC20,
       this.walletInstance
     );
     return await smartContract.allowance(owner, spender);
+  }
+
+  formatAllowance(allowance) {
+    const allowanceValue = Number(allowance);
+    if (allowanceValue === 0) return "0";
+    if (allowanceValue === Number(this.UINT256MAX)) return "uint256 max";
+
+    return allowanceValue.toString();
   }
 
   async approveToken(tokenAddress, amount, spender) {
     try {
       const smartContract = new ethers.Contract(
         tokenAddress,
-        this.ERC20_ABI,
+        this.ABIs.ERC20,
         this.walletInstance
       );
       const tokenName = await smartContract.symbol();
@@ -282,23 +302,24 @@ export default class Core {
           : amount === this.UINT256MAX
           ? "uint max"
           : amount.toString();
-      let action = amount === 0 ? "Unapproving" : "Approving";
+      const action = amount === 0 ? "Unapproving" : "Approving";
 
       Twist.log(
-        `Executing: ${action} ${formattedAmount} ${tokenName} to ${spender}`,
+        `Executing: ${action} ${formattedAmount} ${tokenName} to IZUMI ROUTER`,
         this.acc,
         this,
         `Starting approval...`
       );
-      await this.sleep(1000);
+
       const tx = await this.handleTransaction(
         () =>
           smartContract.approve(spender, amount, {
-            gasLimit: 75000,
+            gasLimit: 100000,
             gasPrice: this.FIXED_GAS_PRICE,
           }),
         `${action} ${tokenName}`
       );
+
       if (!tx) {
         return this.handleError(action, `Transaction failed to send.`);
       }
@@ -309,13 +330,14 @@ export default class Core {
       );
 
       Twist.log(
-        `📋 Transaction executed at tx: ${tx.hash}`,
+        `📋 Transaction executed at tx: ${this.formatTxHash(tx.hash)}`,
         this.acc,
         this,
         `✅ ${action} success`
       );
+
       this.swapCount++;
-      await this.sleep(1000);
+      await this.getBalances(true);
     } catch (error) {
       console.error(error);
       this.handleError(`Spending Token ${tokenAddress}`, `${error.message}`);
@@ -328,7 +350,8 @@ export default class Core {
       const balanceEther = Number(
         ethers.formatEther(await this.provider.getBalance(this.address))
       );
-      if (balanceEther < Number(Settup.MINIMUMBUY)) {
+
+      if (balanceEther < Number(Setup.MINIMUMBUY)) {
         return this.handleError(
           `performTransaction failed`,
           `Insufficient balance ETH for swap`
@@ -338,9 +361,9 @@ export default class Core {
       const tokensToSwap = ["USDT", "USDC", "TAIKO"];
 
       for (const token of tokensToSwap) {
-        let amountIn = await Helper.randomFloat(
-          Settup.MINIMUMBUY,
-          Settup.MAXBUY,
+        const amountIn = await Helper.randomFloat(
+          Setup.MINIMUMBUY,
+          Setup.MAXBUY,
           8
         ).toString();
         await Helper.delay(
@@ -360,10 +383,10 @@ export default class Core {
           token
         );
       }
-
       await this.swapAllTokensToWeth();
     } catch (err) {
       console.error(err);
+      await this.handleError("Failed performSwap", err.message);
     }
   }
 
@@ -371,10 +394,13 @@ export default class Core {
     try {
       const tokens = ["usdc", "usdt", "taiko"];
       for (const token of tokens) {
-        const balance = await this[`${token}Contract`].balanceOf(this.address);
+        const balance = await this.contractInstances[token].balanceOf(
+          this.address
+        );
         const formattedBalance = Number(
           ethers.formatUnits(balance, token === "taiko" ? 18 : 6)
         ).toFixed(token === "taiko" ? 8 : 6);
+
         if (formattedBalance > 0) {
           await Helper.delay(
             2000,
@@ -396,7 +422,9 @@ export default class Core {
         }
       }
 
-      const wethBalance = await this.wethContract.balanceOf(this.address);
+      const wethBalance = await this.contractInstances.weth.balanceOf(
+        this.address
+      );
       if (Number(ethers.formatUnits(wethBalance, 18)).toFixed(8) > 0) {
         await Helper.delay(
           2000,
@@ -428,16 +456,18 @@ export default class Core {
         deadline: Math.floor(Date.now() / 1000) + 1800,
       };
 
-      const data = this.swapRouterContract.interface.encodeFunctionData(
-        "swapAmount",
-        [params]
-      );
+      const data =
+        this.contractInstances.swapRouter.interface.encodeFunctionData(
+          "swapAmount",
+          [params]
+        );
+
       const transaction = {
-        to: this.ROUTER_ADDRESS,
+        to: this.contracts.ROUTER_ADDRESS,
         from: this.address,
         value: 0,
         data: data,
-        gasLimit: Settup.GASLIMIT,
+        gasLimit: Setup.GASLIMIT,
         gasPrice: this.FIXED_GAS_PRICE,
         nonce: await this.provider.getTransactionCount(this.address),
       };
@@ -450,7 +480,7 @@ export default class Core {
       ).toFixed(fromToken.toLowerCase() === "taiko" ? 8 : 6);
 
       try {
-        let action = `🔄 Swapping ${formattedBalance} ${fromToken.toUpperCase()} into ${toToken.toUpperCase()}`;
+        const action = `🔄 Swapping ${formattedBalance} ${fromToken.toUpperCase()} into ${toToken.toUpperCase()}`;
         const tx = await this.retryTransaction(async () => {
           return await this.handleTransaction(
             async () => await this.walletInstance.sendTransaction(transaction),
@@ -467,37 +497,27 @@ export default class Core {
 
         const transactionHash = tx.hash || "N/A";
         await this.waitForTransactionConfirmation(transactionHash, action);
-        await this.fetchUserHistory(tx.hash);
+        await this.fetchUserHistory(transactionHash);
+
         Twist.log(
-          `📋 Transaction executed at tx: ${transactionHash}`,
+          `📋 Transaction executed at tx: ${this.formatTxHash(
+            transactionHash
+          )}`,
           this.acc,
           this,
           `✅ Swapping ${formattedBalance} ${fromToken.toUpperCase()} to ${toToken.toUpperCase()} success`
         );
 
         this.swapCount++;
-        await this.sleep(1000);
         await this.getBalances(true);
       } catch (error) {
-        const errorMessage = error.message || "Unknown error";
-        const transactionHash = error.transactionHash || (tx ? tx.hash : "N/A");
-        const reason =
-          transactionHash !== "N/A"
-            ? await this.getTransactionError(transactionHash)
-            : "Invalid transaction hash";
-
-        this.handleError(
-          `Swapping ${formattedBalance} ETH into USDC`,
-          `Error : ${errorMessage} | Transaction Hash: ${transactionHash} | Reason: ${reason}`
+        console.error(error);
+        this.handleTransactionError(
+          error,
+          formattedBalance,
+          fromToken,
+          toToken
         );
-
-        await this.sleep(5000);
-        this.handleError(
-          `Transaction failed with error: ${errorMessage} | Hash: ${transactionHash} | Reason: ${reason}`,
-          `Transaction failed`
-        );
-
-        return null;
       }
     } catch (error) {
       console.error(error);
@@ -518,26 +538,29 @@ export default class Core {
         deadline: Math.floor(Date.now() / 1000) + 1800,
       };
 
-      let encode = this.swapRouterContract.interface.encodeFunctionData(
-        "swapAmount",
-        [params]
-      );
-      let call_args = this.swapRouterContract.interface.encodeFunctionData(
-        "multicall",
-        [[encode, "0x12210e8a"]]
-      );
+      const encode =
+        this.contractInstances.swapRouter.interface.encodeFunctionData(
+          "swapAmount",
+          [params]
+        );
+      const call_args =
+        this.contractInstances.swapRouter.interface.encodeFunctionData(
+          "multicall",
+          [[encode, "0x12210e8a"]]
+        );
 
       const transaction = {
-        to: this.ROUTER_ADDRESS,
+        to: this.contracts.ROUTER_ADDRESS,
         from: this.address,
         value: ethers.parseEther(amountIn),
         data: call_args,
-        gasLimit: Settup.GASLIMIT,
+        gasLimit: Setup.GASLIMIT,
         gasPrice: this.FIXED_GAS_PRICE,
         nonce: await this.provider.getTransactionCount(this.address),
       };
+
       try {
-        let action = `🔄 Swapping ${amountIn} ${fromToken} into ${toToken}`;
+        const action = `🔄 Swapping ${amountIn} ${fromToken} into ${toToken}`;
         const tx = await this.retryTransaction(async () => {
           return await this.handleTransaction(
             async () => await this.walletInstance.sendTransaction(transaction),
@@ -553,41 +576,30 @@ export default class Core {
         }
 
         const transactionHash = tx.hash || "N/A";
-        await this.fetchUserHistory(tx.hash);
+        await this.fetchUserHistory(transactionHash);
         await this.waitForTransactionConfirmation(transactionHash, action);
 
         Twist.log(
-          `📋 Transaction executed at tx: ${transactionHash}`,
+          `📋 Transaction executed at tx: ${this.formatTxHash(
+            transactionHash
+          )}`,
           this.acc,
           this,
           `✅ Swapping ${
-            Settup.MINIMUMBUY
+            Setup.MINIMUMBUY
           } ${fromToken.toUpperCase()} to ${toToken.toUpperCase()} success`
         );
 
         this.swapCount++;
-        await this.sleep(1000);
         await this.getBalances(true);
       } catch (error) {
-        const errorMessage = error.message || "Unknown error";
-        const transactionHash = error.transactionHash || (tx ? tx.hash : "N/A");
-        const reason =
-          transactionHash !== "N/A"
-            ? await this.getTransactionError(transactionHash)
-            : "Invalid transaction hash";
-
-        this.handleError(
-          `Swapping ${Settup.MINIMUMBUY} ETH into USDC`,
-          `${errorMessage} | Transaction Hash: ${transactionHash} | Reason: ${reason}`
+        console.error(error);
+        this.handleTransactionError(
+          error,
+          Setup.MINIMUMBUY,
+          fromToken,
+          toToken
         );
-
-        await this.sleep(5000);
-        this.handleError(
-          `Transaction failed with error: ${errorMessage} | Hash: ${transactionHash} | Reason: ${reason}`,
-          `Transaction failed`
-        );
-
-        return null;
       }
     } catch (error) {
       console.error(error);
@@ -596,80 +608,77 @@ export default class Core {
     }
   }
 
+  async handleTransactionError(error, amount, fromToken, toToken) {
+    const errorMessage = error.message || "Unknown error";
+    const transactionHash = error.transactionHash || "N/A";
+    const reason =
+      transactionHash !== "N/A"
+        ? await this.getTransactionError(transactionHash)
+        : "Invalid transaction hash";
+
+    this.handleError(
+      `Swapping ${amount} ${fromToken} into ${toToken}`,
+      `${errorMessage} | Transaction Hash: ${this.formatTxHash(
+        transactionHash
+      )}         } | Reason: ${reason}`
+    );
+
+    await this.sleep(5000);
+    this.handleError(
+      `Transaction failed with error: ${errorMessage} | Hash: ${this.formatTxHash(
+        transactionHash
+      )} | Reason: ${reason}`,
+      `Transaction failed`
+    );
+  }
+
   async unwrap(amount) {
     try {
-      let encode = await this.wethContract.interface.encodeFunctionData(
+      const encode = this.contractInstances.weth.interface.encodeFunctionData(
         "withdraw",
         [amount.toString()]
       );
 
       const transaction = {
-        to: this.WETH,
+        to: this.contracts.WETH,
         from: this.address,
         value: 0,
         data: encode,
-        gasLimit: 55000,
+        gasLimit: 155000,
         gasPrice: this.FIXED_GAS_PRICE,
         nonce: await this.provider.getTransactionCount(this.address),
       };
 
-      try {
-        let action = `🔄 Unwrapping ${Number(
-          ethers.formatUnits(amount, 18)
-        ).toFixed(8)} WETH into ETH`;
-        const tx = await this.retryTransaction(async () => {
-          return await this.handleTransaction(
-            async () => await this.walletInstance.sendTransaction(transaction),
-            action
-          );
-        });
+      const action = `🔄 Unwrapping ${Number(
+        ethers.formatUnits(amount, 18)
+      ).toFixed(8)} WETH into ETH`;
+      const tx = await this.retryTransaction(() =>
+        this.handleTransaction(
+          () => this.walletInstance.sendTransaction(transaction),
+          action
+        )
+      );
 
-        if (!tx) {
-          this.handleError(action, `Transaction failed to send.`);
-          this.swapCount++;
-          await this.getBalances(true);
-          return;
-        }
-
-        const transactionHash = tx.hash || "N/A";
-        await this.waitForTransactionConfirmation(transactionHash, action);
-        await this.fetchUserHistory(tx.hash);
-        Twist.log(
-          `📋 Transaction executed at tx: ${transactionHash}`,
-          this.acc,
-          this,
-          `✅ Unwraping ${Number(ethers.formatUnits(amount, 18)).toFixed(
-            8
-          )} WETH to ETH success`
-        );
-
-        this.swapCount++;
-        await this.sleep(1000);
-
-        await this.getBalances(true);
-      } catch (error) {
-        const errorMessage = error.message || "Unknown error";
-        const transactionHash = error.transactionHash || (tx ? tx.hash : "N/A");
-        const reason =
-          transactionHash !== "N/A"
-            ? await this.getTransactionError(transactionHash)
-            : "Invalid transaction hash";
-
-        this.handleError(
-          `Unwraping ${Number(ethers.formatUnits(amount, 18)).toFixed(
-            8
-          )} WETH into ETH`,
-          `${errorMessage} | Transaction Hash: ${transactionHash} | Reason: ${reason}`
-        );
-
-        await this.sleep(5000);
-        this.handleError(
-          `Transaction failed with error: ${errorMessage} | Hash: ${transactionHash} | Reason: ${reason}`,
-          `Transaction failed`
-        );
-
-        return null;
+      if (!tx) {
+        this.handleError(action, `Transaction failed to send.`);
+        return;
       }
+
+      await this.waitForTransactionConfirmation(tx.hash, action);
+      await this.fetchUserHistory(tx.hash);
+
+      Twist.log(
+        `📋 Transaction executed at tx: ${this.formatTxHash(tx.hash)}`,
+        this.acc,
+        this,
+        `✅ Unwrapping ${Number(ethers.formatUnits(amount, 18)).toFixed(
+          8
+        )} WETH to ETH success`
+      );
+
+      this.swapCount++;
+      await this.sleep(1000);
+      await this.getBalances(true);
     } catch (error) {
       console.error(error);
       this.handleError(`Failed to unwrap WETH`, `❌ Error: ${error.message}`);
@@ -682,18 +691,13 @@ export default class Core {
       return null;
     }
 
-    let loading;
-    const spinnerChars = Settup.animation;
-    let elapsedTime = 0;
+    const loading = this.startLoadingSpinner(
+      Setup.animation,
+      action,
+      `Waiting for transaction confirmation.`
+    );
 
     try {
-      loading = this.startLoadingSpinner(
-        spinnerChars,
-        elapsedTime,
-        action,
-        `Waiting for transaction confirmation ${this.formatTxHash(txHash)}`
-      );
-
       const receipt = await this.provider.waitForTransaction(txHash);
       clearInterval(loading);
       process.stdout.write("\r\x1b[K");
@@ -713,6 +717,7 @@ export default class Core {
         this,
         `✅ Transaction ${this.formatTxHash(txHash)} confirmed.`
       );
+      await this.sleep(2000);
       return receipt;
     } catch (error) {
       console.error(error);
@@ -728,7 +733,8 @@ export default class Core {
       const receipt = await this.provider.getTransactionReceipt(txHash);
       if (receipt && receipt.logs) {
         for (const log of receipt.logs) {
-          const errorEvent = this.swapRouterContract.interface.parseLog(log);
+          const errorEvent =
+            this.contractInstances.swapRouter.interface.parseLog(log);
           if (errorEvent) {
             return errorEvent.args[0];
           }
@@ -744,27 +750,26 @@ export default class Core {
   async handleTransaction(fn, action) {
     try {
       const tx = await fn();
-      if (tx && tx.hash) {
+      if (tx?.hash) {
         Twist.log(
           `${action}`,
           this.acc,
           this,
-          `✅ Transaction sent, txid: ${tx.hash}`
+          `✅ Transaction sent, txid: ${this.formatTxHash(tx.hash)}`
         );
-        await this.sleep(1500);
         return tx;
       } else {
-        this.handleError(`${action}`, `Transaction failed to send.`);
+        this.handleError(action, `Transaction failed to send.`);
         return null;
       }
     } catch (error) {
       console.error(error);
-      this.handleError(`${action}`, `during transaction: ${error.message}`);
+      this.handleError(action, `during transaction: ${error.message}`);
       return null;
     }
   }
 
-  async retryTransaction(fn, maxAttempts = 1) {
+  async retryTransaction(fn, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await fn();
@@ -779,22 +784,24 @@ export default class Core {
             `Retrying... Attempt ${attempt + 1}/${maxAttempts}`,
             `Previous attempt failed: ${error.message}`
           );
-          continue;
+        } else {
+          this.handleError(
+            `Function retryTransaction failed.`,
+            `Max attempts reached, transaction failed.`
+          );
+          return null;
         }
       }
     }
-    this.handleError(
-      `Function retryTransaction failed.`,
-      `Max attempts reached, transaction failed.`
-    );
-    return null;
   }
 
   async handleError(action, error) {
-    Twist.log(action, this.acc, this, `❌ Error : ${error}`);
+    Twist.log(action, this.acc, this, `❌ Error: ${error}`);
+    await this.sleep(3500);
   }
 
-  startLoadingSpinner(spinnerChars, elapsedTime, action, message) {
+  startLoadingSpinner(spinnerChars, action, message) {
+    let elapsedTime = 0;
     return setInterval(() => {
       const timeString = this.formatElapsedTime(elapsedTime);
       Twist.log(
@@ -829,8 +836,7 @@ export default class Core {
 
   async getUserData() {
     try {
-      const config = this.createAxiosConfig();
-      const result = await axios(config);
+      const result = await axios(this.createAxiosConfig());
 
       if (result.status === 200) {
         this.score = result.data.score;
@@ -852,53 +858,13 @@ export default class Core {
     return {
       url: `https://trailblazer.mainnet.taiko.xyz/s2/user/rank?address=${this.address}`,
       method: "GET",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-        accept: "application/json, text/plain, */*",
-        "accept-language": "id-ID,id;q=0.9",
-        "cache-control": "no-cache",
-        pragma: "no-cache",
-        priority: "u=1, i",
-        "sec-ch-ua":
-          '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site",
-        Referer: "https://trailblazers.taiko.xyz/",
-        "Referrer-Policy": "strict-origin-when-cross-origin",
-      },
+      headers: this.getDefaultHeaders(),
     };
   }
 
   async fetchUserHistory(txHash) {
     try {
-      let config = {
-        url: `https://trailblazer.mainnet.taiko.xyz/s2/user/history?address=${this.address}`,
-        method: "GET",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-          accept: "application/json, text/plain, */*",
-          "accept-language": "id-ID,id;q=0.9",
-          "cache-control": "no-cache",
-          pragma: "no-cache",
-          priority: "u=1, i",
-          "sec-ch-ua":
-            '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
-          "sec-ch-ua-mobile": "?0",
-          "sec-ch-ua-platform": '"Windows"',
-          "sec-fetch-dest": "empty",
-          "sec-fetch-mode": "cors",
-          "sec-fetch-site": "same-site",
-          Referer: "https://trailblazers.taiko.xyz/",
-          "Referrer-Policy": "strict-origin-when-cross-origin",
-        },
-      };
-
-      const result = await axios(config);
+      const result = await axios(this.createHistoryAxiosConfig());
 
       if (result.status === 200) {
         const item = result.data.items.find((item) => item.tx_hash === txHash);
@@ -912,25 +878,48 @@ export default class Core {
         );
         return null;
       }
-    } catch (err) {
-      return this.handleAxiosError(err);
+    } catch (error) {
+      this.handleAxiosError(error);
     }
   }
 
+  createHistoryAxiosConfig() {
+    return {
+      url: `https://trailblazer.mainnet.taiko.xyz/s2/user/history?address=${this.address}`,
+      method: "GET",
+      headers: this.getDefaultHeaders(),
+    };
+  }
+
+  getDefaultHeaders() {
+    return {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+      accept: "application/json, text/plain, */*",
+      "accept-language": "id-ID,id;q=0.9",
+      "cache-control": "no-cache",
+      pragma: "no-cache",
+      priority: "u=1, i",
+      "sec-ch-ua":
+        '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": '"Windows"',
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": "same-site",
+      Referer: "https://trailblazers.taiko.xyz/",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+    };
+  }
+
   handleAxiosError(error) {
-    if (error.response) {
-      this.handleError(
-        "Failed get user data.",
-        new Error(`${error.response.status} - ${error.response.data}`)
-      );
-    } else if (error.request) {
-      this.handleError(
-        "Failed get user data.",
-        new Error(`No response received: ${error.message}`)
-      );
-    } else {
-      this.handleError("Failed get user data.", error);
-    }
+    const errorMessage = error.response
+      ? `${error.response.status} - ${error.response.data}`
+      : error.request
+      ? `No response received: ${error.message}`
+      : error.message;
+
+    this.handleError("Failed to get user data.", new Error(errorMessage));
   }
 
   async sleep(ms) {

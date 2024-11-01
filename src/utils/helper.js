@@ -1,7 +1,7 @@
 import Twist from "./twister.js";
 import bip39 from "bip39";
 import moment from "moment-timezone";
-import { Settup } from "../../settup.js";
+import { Setup } from "../../setup.js";
 import wcwidth from "wcwidth";
 
 export class Helper {
@@ -28,7 +28,7 @@ export class Helper {
   ) {
     return new Promise((resolve) => {
       let loading;
-      const spinnerChars = Settup.animation;
+      const spinnerChars = Setup.animation;
       let spinnerIndex = 0;
       let elapsedTime = 0;
 

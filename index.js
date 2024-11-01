@@ -1,8 +1,8 @@
-import { Settup } from "./settup.js";
+import { Setup } from "./setup.js";
 import Core from "./src/core/core.js";
 import { Helper } from "./src/utils/helper.js";
 import Twist from "./src/utils/twister.js";
-const privateKey = Settup.privateKey;
+const privateKey = Setup.privateKey;
 
 async function sleep(ms) {
   if (ms < 0) throw new Error("Sleep time must be a non-negative number");
@@ -10,10 +10,10 @@ async function sleep(ms) {
 }
 
 async function countdown(core) {
-  const delayMs = 3600000 * Settup.DELAYINHOURS;
+  const delayMs = 3600000 * Setup.DELAYINHOURS;
   const accountIndex =
-    Settup.privateKey.indexOf(core.walletInstance.privateKey) + 1;
-  const spinnerChars = Settup.animation;
+    Setup.privateKey.indexOf(core.walletInstance.privateKey) + 1;
+  const spinnerChars = Setup.animation;
   let elapsedTime = 0;
 
   return new Promise((resolve) => {
@@ -56,7 +56,7 @@ async function operateAccount(privateKey) {
 
     while (true) {
       try {
-        if (core.swapCount >= Settup.MAXCOUNT) {
+        if (core.swapCount >= Setup.MAXCOUNT) {
           await countdown(core);
           core.swapCount = 0;
         } else {
@@ -72,7 +72,7 @@ async function operateAccount(privateKey) {
   } catch (error) {
     await core.handleError(
       "Failed to start bot",
-      `on Initial setup error: ${error.message}`
+      `on Initial Setup error: ${error.message}`
     );
   }
 }
@@ -81,7 +81,7 @@ async function operateAccount(privateKey) {
   Helper.showLogo();
 
   if (!Array.isArray(privateKey) || privateKey.length < 1) {
-    throw new Error("Please set up Settup.js first");
+    throw new Error("Please set up Setup.js first");
   }
 
   for (const key of privateKey) {
