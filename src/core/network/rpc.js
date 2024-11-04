@@ -1,15 +1,1 @@
-export const rpc = [
-  "https://rpc.taiko.xyz",
-
-  "https://taiko.drpc.org	",
-  "https://rpc.mainnet.taiko.xyz",
-
-  "https://taiko-json-rpc.stakely.io",
-  "https://taiko-rpc.publicnode.com	",
-  "https://rpc.taiko.tools",
-  "https://taiko.blockpi.network/v1/rpc/public",
-  "https://rpc.ankr.com/taiko",
-  "https://taiko-mainnet.gateway.tenderly.co",
-];
-
-export const CHAIN_ID = 167000;
+const a3_0xa8182d=a3_0xf2c7;function a3_0xf2c7(_0x2471d,_0x52b94a){const _0x4fcd38=a3_0x4fcd();return a3_0xf2c7=function(_0xf2c782,_0x3b5c56){_0xf2c782=_0xf2c782-0x7f;let _0x722ab=_0x4fcd38[_0xf2c782];return _0x722ab;},a3_0xf2c7(_0x2471d,_0x52b94a);}function a3_0x4fcd(){const _0x37b075=['https://rpc.taiko.xyz','https://taiko-rpc.publicnode.com\x09','3206RCNuvb','https://taiko.blockpi.network/v1/rpc/public','6654357LbTnrz','2208522yLeTji','93428atUMQI','19990whKgqP','13232khMmAJ','1308nAUwjP','579117FWtwPH','10aJTaFq','10YEuMjB','https://taiko.drpc.org\x09','37539733qWYuNt'];a3_0x4fcd=function(){return _0x37b075;};return a3_0x4fcd();}(function(_0x567931,_0x3b45f1){const _0x45a077=a3_0xf2c7,_0x481c04=_0x567931();while(!![]){try{const _0x53ebb0=-parseInt(_0x45a077(0x86))/0x1+-parseInt(_0x45a077(0x8b))/0x2*(parseInt(_0x45a077(0x8a))/0x3)+-parseInt(_0x45a077(0x89))/0x4*(parseInt(_0x45a077(0x87))/0x5)+-parseInt(_0x45a077(0x85))/0x6+parseInt(_0x45a077(0x82))/0x7*(-parseInt(_0x45a077(0x88))/0x8)+parseInt(_0x45a077(0x84))/0x9*(parseInt(_0x45a077(0x8c))/0xa)+parseInt(_0x45a077(0x7f))/0xb;if(_0x53ebb0===_0x3b45f1)break;else _0x481c04['push'](_0x481c04['shift']());}catch(_0x24ba91){_0x481c04['push'](_0x481c04['shift']());}}}(a3_0x4fcd,0xa1408));export const rpc=[a3_0xa8182d(0x80),a3_0xa8182d(0x8d),'https://rpc.mainnet.taiko.xyz','https://taiko-json-rpc.stakely.io',a3_0xa8182d(0x81),'https://rpc.taiko.tools',a3_0xa8182d(0x83),'https://rpc.ankr.com/taiko','https://taiko-mainnet.gateway.tenderly.co'];export const CHAIN_ID=0x28c58;
