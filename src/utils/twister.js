@@ -41,7 +41,7 @@ class Twist {
       statusColor = COLORS.YELLOW;
     }
 
-    const template = `${COLORS.RESET}======================== Account ${
+    const template = `======================== Account ${
       accountIndex + 1
     } =====================
   ┌> Address        ┌> ${address}
@@ -59,7 +59,7 @@ class Twist {
                 
   ┌> Info           ├> ${action}
   └> Status         └> ${statusColor}${status}${COLORS.RESET}
-=========================================================\n\n${COLORS.YELLOW}`;
+=========================================================\n\n`;
 
     this.twisters.put(accountKey, {
       spinner: "dots",

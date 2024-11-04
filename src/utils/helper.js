@@ -147,8 +147,9 @@ export class Helper {
     logoLines.forEach(centerLog);
 
     centerLog(` `);
+    centerLog(`TAIKO TRAILBLAZERS `);
     centerLog(
-      `Auto transaction on ${ConsoleColors.GREEN}TAIKO mainnet ${ConsoleColors.RESET}`
+      `Auto SWAP on ${ConsoleColors.GREEN}IZUMI-HENJIN-KODO SWAP${ConsoleColors.RESET}`
     );
     centerLog(
       `Join to my Group : ${ConsoleColors.GREEN}@autosultan_group${ConsoleColors.RESET}`

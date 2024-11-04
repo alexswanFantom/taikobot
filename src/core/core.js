@@ -2,7 +2,13 @@ import { ethers } from "ethers";
 import axios from "axios";
 import { Helper } from "../utils/helper.js";
 import { rpc } from "./network/rpc.js";
-import { IZUMIABI, WETHABI, ERC20_ABI } from "./abi/abi.js";
+import {
+  IZUMIABI,
+  WETHABI,
+  ERC20_ABI,
+  HENJIN_ABI,
+  KODO_ABI,
+} from "./abi/abi.js";
 import Twist from "../utils/twister.js";
 import { validateAddress, getContract } from "./constant/constant.js";
 import { Setup } from "../../setup.js"; //Setup
@@ -54,15 +60,20 @@ export default class Core {
     this.FIXED_GAS_PRICE = ethers.parseUnits(Setup.GASPRICE, "gwei");
     this.contracts = {
       WETH: validateAddress(getContract("weth")),
+      ETH: validateAddress(getContract("weth")),
       TAIKO: validateAddress(getContract("taiko")),
       USDC: validateAddress(getContract("usdc")),
       USDT: validateAddress(getContract("usdt")),
       ROUTER_ADDRESS: validateAddress(getContract("izumi-swap")),
+      HENJIN_SWAP: validateAddress(getContract("henjin-swap")),
+      KODO_SWAP: validateAddress(getContract("kodo-swap")),
     };
     this.ABIs = {
       WETH: WETHABI,
       ERC20: ERC20_ABI,
       ROUTER: IZUMIABI,
+      HENJIN: HENJIN_ABI,
+      KODO: KODO_ABI,
     };
     this.txCount = this.swapCount = this.runCount = 0;
     this.walletInstance = null;
@@ -122,6 +133,16 @@ export default class Core {
       swapRouter: new ethers.Contract(
         this.contracts.ROUTER_ADDRESS,
         this.ABIs.ROUTER,
+        this.walletInstance
+      ),
+      henjinRouter: new ethers.Contract(
+        this.contracts.HENJIN_SWAP,
+        this.ABIs.HENJIN,
+        this.walletInstance
+      ),
+      kodoRouter: new ethers.Contract(
+        this.contracts.KODO_SWAP,
+        this.ABIs.KODO,
         this.walletInstance
       ),
     };
@@ -356,31 +377,57 @@ export default class Core {
         );
       }
 
-      const tokensToSwap = ["USDT", "USDC", "TAIKO"];
+      const swapConfigurations = [
+        {
+          tokens: ["usdc", "taiko"],
+          swapFunction: this.swapEthOnHenjin.bind(this),
+          platform: "HENJIN-SWAP",
+        },
+        {
+          tokens: ["usdt", "usdc", "taiko"],
+          swapFunction: this.swapEThonKodo.bind(this),
+          platform: "KODO-SWAP",
+        },
+        {
+          tokens: ["usdt", "usdc", "taiko"],
+          swapFunction: this.swapEthToToken.bind(this),
+          platform: "IZUMI-SWAP",
+          isPath: true,
+        },
+      ];
 
-      for (const token of tokensToSwap) {
-        const amountIn = await Helper.randomFloat(
-          Setup.MINIMUMBUY,
-          Setup.MAXBUY,
-          8
-        ).toString();
-        await Helper.delay(
-          2000,
-          this.acc,
-          this,
-          `Prepare swapping ${amountIn} ETH into ${token}`,
-          ""
-        );
-        await this.swapEthToToken(
-          await this.encodedPath(
-            tokenPath[`eth-${token.toLowerCase()}`][0],
-            tokenPath[`eth-${token.toLowerCase()}`][1]
-          ),
-          amountIn,
-          "ETH",
-          token
-        );
+      for (const config of swapConfigurations) {
+        for (const token of config.tokens) {
+          const amountIn = await Helper.randomFloat(
+            Setup.MINIMUMBUY,
+            Setup.MAXBUY,
+            8
+          ).toString();
+
+          await Helper.delay(
+            2000,
+            this.acc,
+            this,
+            `Prepare swapping ${amountIn} ETH into ${token.toUpperCase()} on ${
+              config.platform
+            }`,
+            ""
+          );
+
+          if (config.isPath) {
+            const path = await this.encodedPath(
+              tokenPath[`eth-${token.toLowerCase()}`][0],
+              tokenPath[`eth-${token.toLowerCase()}`][1]
+            );
+            await config.swapFunction(path, amountIn, "ETH", token);
+          } else {
+            config.platform === "HENJIN-SWAP"
+              ? await config.swapFunction(amountIn, "eth", token)
+              : await config.swapFunction(amountIn, token);
+          }
+        }
       }
+
       await this.swapAllTokensToWeth();
     } catch (err) {
       console.error(err);
@@ -404,7 +451,7 @@ export default class Core {
             2000,
             this.acc,
             this,
-            `Prepare swapping ${formattedBalance} ${token.toUpperCase()} into WETH`,
+            `Prepare swapping ${formattedBalance} ${token.toUpperCase()} into WETH on IZUMI-SWAP`,
             ""
           );
           await this.swapTokensToWeth(
@@ -478,7 +525,7 @@ export default class Core {
       ).toFixed(fromToken.toLowerCase() === "taiko" ? 8 : 6);
 
       try {
-        const action = `🔄 Swapping ${formattedBalance} ${fromToken.toUpperCase()} into ${toToken.toUpperCase()}`;
+        const action = `🔄 Swapping ${formattedBalance} ${fromToken.toUpperCase()} into ${toToken.toUpperCase()} on IZUMI-SWAP`;
         const tx = await this.retryTransaction(async () => {
           return await this.handleTransaction(
             async () => await this.walletInstance.sendTransaction(transaction),
@@ -526,6 +573,166 @@ export default class Core {
     }
   }
 
+  async swapEThonKodo(amountIn, toToken) {
+    try {
+      const routes = [
+        {
+          from: this.contracts.ETH,
+          to: validateAddress(getContract(toToken.toLowerCase())),
+          stable: toToken === "usdc" ? true : false,
+        },
+      ];
+
+      const params = [
+        0,
+        routes,
+        this.address,
+        Math.floor(Date.now() / 1000) + 1800,
+      ];
+
+      const data =
+        this.contractInstances.kodoRouter.interface.encodeFunctionData(
+          "swapExactETHForTokens",
+          params
+        );
+
+      const transaction = {
+        to: this.contracts.KODO_SWAP,
+        from: this.address,
+        value: ethers.parseEther(amountIn),
+        data: data,
+        gasLimit: Setup.GASLIMIT,
+        gasPrice: this.FIXED_GAS_PRICE,
+        nonce: await this.provider.getTransactionCount(this.address),
+      };
+
+      try {
+        const action = `🔄 Swapping ${amountIn} ETH into ${toToken.toUpperCase()} on KODO-SWAP`;
+        const tx = await this.retryTransaction(async () => {
+          return await this.handleTransaction(
+            async () => await this.walletInstance.sendTransaction(transaction),
+            action
+          );
+        });
+
+        if (!tx) {
+          this.handleError(action, `Transaction failed to send.`);
+          this.swapCount++;
+          await this.getBalances(true);
+          return;
+        }
+
+        const transactionHash = tx.hash || "N/A";
+        await this.fetchUserHistory(transactionHash);
+        await this.waitForTransactionConfirmation(transactionHash, action);
+
+        Twist.log(
+          `📋 Transaction executed at tx: ${this.formatTxHash(
+            transactionHash
+          )}`,
+          this.acc,
+          this,
+          `✅ Swapping ${
+            Setup.MINIMUMBUY
+          } ETH to ${toToken.toUpperCase()} success`
+        );
+
+        this.swapCount++;
+        await this.getBalances(true);
+      } catch (error) {
+        console.error(error);
+        this.handleTransactionError(
+          error,
+          Setup.MINIMUMBUY,
+          "ETH",
+          toToken.toUpperCase()
+        );
+      }
+    } catch (error) {
+      console.log(error);
+      console.error(error);
+      await this.handleError("Failed swapTokensToWeth", error.message);
+      return null;
+    }
+  }
+
+  async swapEthOnHenjin(amountIn, fromToken, toToken) {
+    try {
+      let params = [
+        validateAddress(getContract(fromToken)),
+        validateAddress(getContract(toToken)),
+        this.address,
+        Math.floor(Date.now() / 1000) + 1800,
+        ethers.parseEther(amountIn),
+        0,
+        0,
+      ];
+
+      const data =
+        this.contractInstances.henjinRouter.interface.encodeFunctionData(
+          "exactInputSingle",
+          [params]
+        );
+
+      const transaction = {
+        to: this.contracts.HENJIN_SWAP,
+        from: this.address,
+        value: ethers.parseEther(amountIn),
+        data: data,
+        gasLimit: Setup.GASLIMIT,
+        gasPrice: this.FIXED_GAS_PRICE,
+        nonce: await this.provider.getTransactionCount(this.address),
+      };
+
+      try {
+        const action = `🔄 Swapping ${amountIn} ${fromToken.toUpperCase()} into ${toToken.toUpperCase()} on HENJIN-SWAP`;
+        const tx = await this.retryTransaction(async () => {
+          return await this.handleTransaction(
+            async () => await this.walletInstance.sendTransaction(transaction),
+            action
+          );
+        });
+
+        if (!tx) {
+          this.handleError(action, `Transaction failed to send.`);
+          this.swapCount++;
+          await this.getBalances(true);
+          return;
+        }
+
+        const transactionHash = tx.hash || "N/A";
+        await this.fetchUserHistory(transactionHash);
+        await this.waitForTransactionConfirmation(transactionHash, action);
+
+        Twist.log(
+          `📋 Transaction executed at tx: ${this.formatTxHash(
+            transactionHash
+          )}`,
+          this.acc,
+          this,
+          `✅ Swapping ${
+            Setup.MINIMUMBUY
+          } ${fromToken.toUpperCase()} to ${toToken.toUpperCase()} success`
+        );
+
+        this.swapCount++;
+        await this.getBalances(true);
+      } catch (error) {
+        console.error(error);
+        this.handleTransactionError(
+          error,
+          Setup.MINIMUMBUY,
+          fromToken.toUpperCase(),
+          toToken.toUpperCase()
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      await this.handleError("Failed swapTokensToWeth", error.message);
+      return null;
+    }
+  }
+
   async swapEthToToken(path, amountIn, fromToken, toToken) {
     try {
       const params = {
@@ -558,7 +765,7 @@ export default class Core {
       };
 
       try {
-        const action = `🔄 Swapping ${amountIn} ${fromToken} into ${toToken}`;
+        const action = `🔄 Swapping ${amountIn} ${fromToken.toUpperCase()} into ${toToken.toUpperCase()} on IZUMI-SWAP`;
         const tx = await this.retryTransaction(async () => {
           return await this.handleTransaction(
             async () => await this.walletInstance.sendTransaction(transaction),
