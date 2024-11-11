@@ -25,5 +25,5 @@ export class Setup {
   static DELAY = 0.1;
   static DELAYINHOURS = 24;
   static GASPRICE = "0.2"; // 1000 point
-  static GASLIMIT = 382135; // you can  change
+  static GASLIMIT = 386000; // you can  change
 }

@@ -1,2 +1,10 @@
 node_modules
 fixed
+src
+index.js
+setup.js
+taiko.sh
+yarn.lock
+package-lock.json
+.gitignore
+dist
